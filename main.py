@@ -69,7 +69,14 @@ class Net(nn.Module):
         #self.fc = nn.Linear(8 * 50 * 50, 2)
          
     def forward(self, x):
-        #(batch_size, 3, 256, 256)
+        # (batch_size, 3, 256, 256)
+
+        # ========================
+        # TODO 2: forward the data
+        # please write down the output size of each layer
+        # example:
+        # out = self.relu(self.conv1(x))
+        # (batch_size, 64, 256, 256)
         out = self.conv1(x) 
         #(batch_size,16, 256, 256)
         out = self.relu1(out)
@@ -85,7 +92,7 @@ class Net(nn.Module):
         
         out = out.view(out.size(0), -1)
         out = self.fc(out) 
-
+        # ========================
         return out   
 
     def calc_acc(output, target):
@@ -122,7 +129,10 @@ def train(model,device,n_epochs,train_loader,criterion,optimizer):
         ###################
         # train the model #
         ###################
+        # ===============================
+        # TODO 3: switch the model to training mode
         model.train()
+        # ===============================
         #train_loader = total * 70 % = 2500 * 0.7 = 1750
         #BATCH_SIZE = 10 , total step = 1750 / 10 = 175
         step = 0
@@ -145,12 +155,19 @@ def train(model,device,n_epochs,train_loader,criterion,optimizer):
             # backward pass: compute gradient of the loss with respect to model parameters
             loss.backward()
             print("train_losses=",loss.item()*data.size(0))
+            # =============================================
+            # TODO 4: initialize optimizer to zero gradient
             # perform a single optimization step (parameter update)
             optimizer.step()
+            # =============================================
+
+            # =================================================
+            # TODO 5: loss -> backpropagation -> update weights
             # update training loss
             train_losses.append(loss.item()*data.size(0))
             # clear the gradients of all optimized variables
             optimizer.zero_grad()
+            # =================================================
 
             if count==0:
                 train_pred=pred
@@ -189,7 +206,10 @@ def validation(model, device, n_epochs, valid_loader, criterion):
         ######################    
         # validate the model #
         ######################
+        # ===============================
+        # TODO 6: switch the model to validation mode
         model.eval()
+        # ===============================
         #valid_loader = total * 30 % = 2500 * 0.3 = 750
         #BATCH_SIZE = 10 , total step = 750 / 10 = 75
         step = 0
@@ -219,7 +239,10 @@ def validation(model, device, n_epochs, valid_loader, criterion):
             
         val_pred=val_pred.cpu().view(-1).numpy().tolist()
         val_target=val_target.cpu().view(-1).numpy().tolist()
-            
+        
+
+        # ================================
+        # TODO 8: calculate accuracy, loss    
         # calculate average losses
         valid_loss=np.average(valid_losses)
             
@@ -228,6 +251,7 @@ def validation(model, device, n_epochs, valid_loader, criterion):
             
         valid_acc_his.append(valid_acc)
         valid_losses_his.append(valid_loss)
+        # ================================
 
     return valid_acc_his,valid_losses_his,model   
 
