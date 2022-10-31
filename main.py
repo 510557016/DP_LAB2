@@ -10,6 +10,7 @@ from torchvision import transforms,datasets
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 from matplotlib import pyplot as plt
+from PIL import ImageOps
 
 class Net(nn.Module):
     def __init__(self):
@@ -47,17 +48,31 @@ class Net(nn.Module):
         # TODO 1: build your network
         # (weight-kernel+1)/stride+1 無條件進位
         # Convolution 1 , input_shape=(3,256,256)
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, stride=1, padding=1) 
+        self.conv1 = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, stride=1, padding=1) 
         self.relu1 = nn.ReLU() 
-        # Max pool 1
+        # Convolution 2 , input_shape=(64,256,256)
+        self.conv2 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1) 
+        self.relu2 = nn.ReLU()
+        # Convolution 3 , input_shape=(128,256,256) 
+        self.conv3 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, stride=1, padding=1) 
+        self.relu3 = nn.ReLU()  
+        # Max pool 1 ,  input_shape=(128,256,256)
         self.maxpool1 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        # Convolution 2
-        self.conv2 = nn.Conv2d(in_channels=16,out_channels=8, kernel_size=3, stride=1, padding=1) 
-        self.relu2 = nn.ReLU() 
-        # Max pool 2
+        # Convolution 4 , input_shape=(128,128,128)
+        self.conv4 = nn.Conv2d(in_channels=128,out_channels=64, kernel_size=3, stride=1, padding=1) 
+        self.relu4 = nn.ReLU()
+        # Convolution 5 , input_shape=(64,128,128)
+        self.conv5 = nn.Conv2d(in_channels=64,out_channels=64, kernel_size=3, stride=1, padding=1) 
+        self.relu5 = nn.ReLU() 
+        # Max pool 2  , input_shape=(64,128,128)
         self.maxpool2 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        # Fully connected 1 ,#input_shape=(8*50*50)
-        self.fc = nn.Linear(in_features=8 * 64 * 64, out_features=4096)     
+        # Max pool 3  , input_shape=(64,64,64)
+        self.maxpool3 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+        # Fully connected 1 ,#input_shape=(64*32*32)
+        self.fc1 = nn.Linear(in_features=64 * 32 * 32, out_features=120)        
+        self.fc2 = nn.Dropout(0.5)
+        self.fc3 = nn.Linear(in_features=120, out_features=10)
+        self.fc4 = nn.LogSoftmax(dim=1)     
 
         #CLASStorch.nn.Linear(in_features, out_features, bias=True, device=None, dtype=None)
         #in_features指的是输入的二维张量的大小
@@ -78,20 +93,25 @@ class Net(nn.Module):
         # out = self.relu(self.conv1(x))
         # (batch_size, 64, 256, 256)
         out = self.conv1(x) 
-        #(batch_size,16, 256, 256)
         out = self.relu1(out)
-        #(batch_size,16, 256, 256)
-        out = self.maxpool1(out)
-        #(batch_size,16, 128, 128)
-        out = self.conv2(out)
-        #(batch_size, 8, 128, 128)
+        out = self.conv2(out) 
         out = self.relu2(out)
-        #(batch_size, 8, 128, 128)
-        out = self.maxpool2(out)
-        #(batch_size, 8, 64,  64)
+        out = self.conv3(out) 
+        out = self.relu3(out)
+        out = self.maxpool1(out)
         
-        out = out.view(out.size(0), -1)
-        out = self.fc(out) 
+        out = self.conv4(out)        
+        out = self.relu4(out) 
+        out = self.conv5(out)        
+        out = self.relu5(out)         
+        out = self.maxpool2(out)
+        out = self.maxpool3(out)
+        
+        out = torch.flatten(out, 1)
+        out = self.fc1(out) 
+        out = self.fc2(out) 
+        out = self.fc3(out)
+        out = self.fc4(out)  
         # ========================
         return out   
 
@@ -122,8 +142,6 @@ def train(model,device,n_epochs,train_loader,criterion,optimizer):
         
         train_pred = torch.zeros(10,1)
         train_target = torch.zeros(10,1)
-        #print("type(train_pred)=",type(train_pred))
-        #print("train_pred=",train_pred)
         count=0
         print('running epoch: {}'.format(epoch))
         ###################
@@ -137,38 +155,36 @@ def train(model,device,n_epochs,train_loader,criterion,optimizer):
         #BATCH_SIZE = 10 , total step = 1750 / 10 = 175
         step = 0
         for data, target in train_loader:
-            step = step + 1
-            print("train step=",step)
+            step = step + 1  
+            print("train_step=",step)         
             # move tensors to  device
             data, target = data.to(device), target.to(device)
+            # =============================================
+            # TODO 4: initialize optimizer to zero gradient
+            # clear the gradients of all optimized variables
+            optimizer.zero_grad()
+            data.requires_grad = True
+            # =================================================
             # forward pass: compute predicted outputs by passing inputs to the model
             output = model(data)
+            # =================================================
+            # TODO 5: loss -> backpropagation -> update weights
             # calculate the batch loss
             loss = criterion(output, target)
-            #print("loss=",loss)
+            # backward pass: compute gradient of the loss with respect to model parameters
+            loss.backward()
+            # =============================================
             #calculate accuracy
             pred = output.data.max(dim = 1, keepdim = True)[1]
             train_correct += np.sum(np.squeeze(pred.eq(target.data.view_as(pred))).cpu().numpy())
-            print("train_correct=",train_correct)
             train_total += data.size(0)
-            print("train_total=",train_total)
-            # backward pass: compute gradient of the loss with respect to model parameters
-            loss.backward()
-            print("train_losses=",loss.item()*data.size(0))
-            # =============================================
-            # TODO 4: initialize optimizer to zero gradient
-            # perform a single optimization step (parameter update)
-            optimizer.step()
-            # =============================================
-
-            # =================================================
-            # TODO 5: loss -> backpropagation -> update weights
-            # update training loss
             train_losses.append(loss.item()*data.size(0))
-            # clear the gradients of all optimized variables
-            optimizer.zero_grad()
-            # =================================================
-
+            optimizer.step()
+            
+            print("train_total=",train_total)
+            print("train_correct=",train_correct)
+            print("train_losses=",train_losses)
+                       
             if count==0:
                 train_pred=pred
                 train_target=target.data.view_as(pred)
@@ -188,7 +204,7 @@ def train(model,device,n_epochs,train_loader,criterion,optimizer):
 
         train_acc_his.append(train_acc)
         train_losses_his.append(train_loss)
-
+       
     return train_acc_his,train_losses_his,model
 
 def validation(model, device, n_epochs, valid_loader, criterion): 
@@ -213,47 +229,58 @@ def validation(model, device, n_epochs, valid_loader, criterion):
         #valid_loader = total * 30 % = 2500 * 0.3 = 750
         #BATCH_SIZE = 10 , total step = 750 / 10 = 75
         step = 0
-        for data, target in valid_loader:
-            step = step + 1
-            print("validation step=",step)
-            data, target = data.to(device), target.to(device)
-            # forward pass: compute predicted outputs by passing inputs to the model
-            output = model(data)
-            # calculate the batch loss
-            loss =criterion(output, target)
-            #calculate accuracy
-            pred = output.data.max(dim = 1, keepdim = True)[1]
-            val_correct += np.sum(np.squeeze(pred.eq(target.data.view_as(pred))).cpu().numpy())
-            print("val_correct=",val_correct)
-            val_total += data.size(0)
-            print("val_total=",val_total)
-            valid_losses.append(loss.item()*data.size(0))
-            print("valid_losses=",loss.item()*data.size(0))
-            if count==0:
-                val_pred=pred
-                val_target=target.data.view_as(pred)
-                count=count+1
-            else:
-                val_pred=torch.cat((val_pred,pred), 0)
-                val_target=torch.cat((val_target,target.data.view_as(pred)), 0)
-            
-        val_pred=val_pred.cpu().view(-1).numpy().tolist()
-        val_target=val_target.cpu().view(-1).numpy().tolist()
-        
+        with torch._no_grad():
+            for data, target in valid_loader:
+                step = step + 1
+                print("validation step=",step)
+                data, target = data.to(device), target.to(device)
+                # forward pass: compute predicted outputs by passing inputs to the model
+                output = model(data)
+                # calculate the batch loss
+                loss = criterion(output, target)
+                #calculate accuracy
+                pred = output.data.max(dim = 1, keepdim = True)[1]
+                val_correct += np.sum(np.squeeze(pred.eq(target.data.view_as(pred))).cpu().numpy())
+                val_total += data.size(0)
+                valid_losses.append(loss.item()*data.size(0))
 
-        # ================================
-        # TODO 8: calculate accuracy, loss    
-        # calculate average losses
-        valid_loss=np.average(valid_losses)
-            
-        # calculate average accuracy
-        valid_acc=val_correct/val_total
-            
-        valid_acc_his.append(valid_acc)
-        valid_losses_his.append(valid_loss)
-        # ================================
+                print("val_correct=",valid_acc_his)
+                print("valid_losses=",valid_losses_his)
+              
+                if count==0:
+                    val_pred=pred
+                    val_target=target.data.view_as(pred)
+                    count=count+1
+                else:
+                    val_pred=torch.cat((val_pred,pred), 0)
+                    val_target=torch.cat((val_target,target.data.view_as(pred)), 0)
+                
+            val_pred=val_pred.cpu().view(-1).numpy().tolist()
+            val_target=val_target.cpu().view(-1).numpy().tolist()
 
-    return valid_acc_his,valid_losses_his,model   
+            # ================================
+            # TODO 8: calculate accuracy, loss    
+            # calculate average losses
+            probabilities = torch.exp(output)
+            top_prob, top_class = probabilities.topk(1, dim=1)
+            predictions = top_class == target.view(*top_class.shape)
+            valid_acc += torch.mean(predictions.type(torch.FloatTensor)) 
+
+            # ================================   
+
+            # ================================
+            # TODO 8: calculate accuracy, loss    
+            # calculate average losses
+            #valid_loss=np.average(valid_losses)
+                                
+            # calculate average accuracy
+            #valid_acc=val_correct/val_total
+                    
+            #valid_acc_his.append(valid_acc)
+            #valid_losses_his.append(valid_loss)
+            # ================================
+       
+    return valid_acc_his,valid_losses_his  
 
 
 def main():
@@ -273,9 +300,8 @@ def main():
     TRAIN_DATA_PATH = '/home/lenovo/DP/LAB2/data/train'
         #驗證資料路徑
     VALID_DATA_PATH = '/home/lenovo/DP/LAB2/data/train'
-    #EPOCHS = 10
-    EPOCHS = 2
-    MODEL_PATH = '/home/lenovo/DP/LAB2/model.pt'
+    EPOCHS = 40
+    MODEL_PATH = '/home/lenovo/DP/LAB2/data/model.pt'
 
     # train_transform 進行影像強化提高資料多樣性 
     # valid_transform 保持驗證公平性只採用調整大小
@@ -305,18 +331,12 @@ def main():
         #0-1最小值0则变成(0-0.5)/0.5=-1，而最大值1则变成(1-0.5)/0.5=1. 
         transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
     ])
-    # ===================
-    valid_transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-    ])
-
     # =================
     # TODO 12: set up datasets
     # hint: ImageFolder?
     train_data = datasets.ImageFolder(TRAIN_DATA_PATH, transform=train_transform)
     #print(train_data.class_to_idx)
-    valid_data = datasets.ImageFolder(VALID_DATA_PATH, transform=valid_transform)
+    valid_data = datasets.ImageFolder(VALID_DATA_PATH, transform=train_transform)
     # =================
 
     #切分70%當作訓練集、30%當作驗證集
@@ -330,10 +350,20 @@ def main():
     # TODO 13 : set up dataloaders
     train_loader = torch.utils.data.DataLoader(train_data, batch_size=BATCH_SIZE,shuffle=True)
     valid_loader = torch.utils.data.DataLoader(valid_data, batch_size=BATCH_SIZE,shuffle=True)
+    DOWNLOAD_MNIST = True
+    #MNIST_loader = torchvision.datasets.MNIST(root = './mnist',train = True,transform = torchvision.transforms.ToTensor(),download = DOWNLOAD_MNIST)
+    #print(MNIST_loader.train_data.size())
+    #print(MNIST_loader.train_labels.size())
+    #plt.ion()
+    #for i in range(11):
+        #plt.imshow(MNIST_loader.train_data[i].numpy(), cmap = 'gray')
+        #plt.title('%i' % MNIST_loader.train_labels[i])
+        #plt.pause(0.5)
+    #plt.show()
     # ============================
 
     # build model, criterion and optimizer
-    model = Net().to(device)
+    model_1 = Net().to(device)
     #定義損失函數及learn rate
     #CLASStorch.optim.Optimizer(params, defaults)
     #Adadelta   Implements Adadelta algorithm.
@@ -349,27 +379,25 @@ def main():
     #RMSprop    Implements RMSprop algorithm.
     #Rprop      Implements the resilient backpropagation algorithm.
     #SGD        Implements stochastic gradient descent (optionally with momentum).
-    #optimizer = torch.optim.Adam(params = model.parameters(), lr = LEARNING_RATE)
-    
     # ================================
     # TODO 14: criterion and optimizer
-    optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
+    #optimizer = torch.optim.Adam(params = model.parameters(), lr = LEARNING_RATE)
+    optimizer = torch.optim.SGD(model_1.parameters(), lr=LEARNING_RATE, momentum=0.9)
     criterion = nn.CrossEntropyLoss()
     # ================================
     
-    train_acc_his,train_losses_his,model = train(model,device,EPOCHS,train_loader,criterion,optimizer)
+    train_acc_his,train_losses_his,model = train(model_1,device,EPOCHS,train_loader,criterion,optimizer)
     print("train_acc_his=",train_acc_his)
     print("train_losses_his=",train_losses_his)
     print("model=",model)
 
-    valid_acc_his,valid_losses_his, model = validation(model,device,EPOCHS, valid_loader, criterion)
+    valid_acc_his,valid_losses_his = validation(model_1,device,EPOCHS,valid_loader,criterion)
     print("valid_acc_his=",valid_acc_his)
     print("valid_losses_his=",valid_losses_his)
-    print("model=",model)
 
     # ==================================
     # TODO 15: save the model parameters
-    torch.save(model, MODEL_PATH)
+    torch.save(model.state_dict(), MODEL_PATH)
     # ==================================
 
     # ========================================
