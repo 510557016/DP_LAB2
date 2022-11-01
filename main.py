@@ -10,7 +10,6 @@ from torchvision import transforms,datasets
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 from matplotlib import pyplot as plt
-from PIL import ImageOps
 
 class Net(nn.Module):
     def __init__(self):
@@ -47,33 +46,45 @@ class Net(nn.Module):
         # ===========================
         # TODO 1: build your network
         # (weight-kernel+1)/stride+1 無條件進位
+                      
         # Convolution 1 , input_shape=(3,256,256)
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, stride=1, padding=1) 
         self.relu1 = nn.ReLU() 
-        # Convolution 2 , input_shape=(64,256,256)
+
+        # Max pool 1 ,  input_shape=(64,256,256)
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
+
+        # Convolution 2 , input_shape=(64,128,128)
         self.conv2 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1) 
         self.relu2 = nn.ReLU()
-        # Convolution 3 , input_shape=(128,256,256) 
-        self.conv3 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, stride=1, padding=1) 
-        self.relu3 = nn.ReLU()  
-        # Max pool 1 ,  input_shape=(128,256,256)
-        self.maxpool1 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        # Convolution 4 , input_shape=(128,128,128)
-        self.conv4 = nn.Conv2d(in_channels=128,out_channels=64, kernel_size=3, stride=1, padding=1) 
-        self.relu4 = nn.ReLU()
-        # Convolution 5 , input_shape=(64,128,128)
-        self.conv5 = nn.Conv2d(in_channels=64,out_channels=64, kernel_size=3, stride=1, padding=1) 
-        self.relu5 = nn.ReLU() 
-        # Max pool 2  , input_shape=(64,128,128)
-        self.maxpool2 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        # Max pool 3  , input_shape=(64,64,64)
-        self.maxpool3 = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        # Fully connected 1 ,#input_shape=(64*32*32)
-        self.fc1 = nn.Linear(in_features=64 * 32 * 32, out_features=120)        
-        self.fc2 = nn.Dropout(0.5)
-        self.fc3 = nn.Linear(in_features=120, out_features=10)
-        self.fc4 = nn.LogSoftmax(dim=1)     
 
+        # Convolution 3 , input_shape=(128,128,128) 
+        self.conv3 = nn.Conv2d(in_channels=128, out_channels=512, kernel_size=3, stride=1, padding=1) 
+        self.relu3 = nn.ReLU()  
+        
+        # Convolution 4 , input_shape=(512,128,128)
+        self.conv4 = nn.Conv2d(in_channels=512,out_channels=512, kernel_size=3, stride=1, padding=1) 
+        self.relu4 = nn.ReLU()
+        self.drout1 = nn.Dropout2d(0.5)
+        
+        # Convolution 5 , input_shape=(512,128,128)
+        self.conv5 = nn.Conv2d(in_channels=512,out_channels=128, kernel_size=3, stride=1, padding=1) 
+        self.relu5 = nn.ReLU()
+
+        # Convolution 6 , input_shape=(128,128,128)
+        self.conv6 = nn.Conv2d(in_channels=128,out_channels=64, kernel_size=3, stride=1, padding=1) 
+        self.relu6 = nn.ReLU() 
+
+        # Convolution 7 , input_shape=(64,128,128)
+        self.conv7 = nn.Conv2d(in_channels=64,out_channels=32, kernel_size=3, stride=1, padding=1) 
+        self.relu7 = nn.ReLU()  
+        self.drout2 = nn.Dropout2d(0.5)
+                
+        # Fully connected 1 ,#input_shape=(32*128*128)
+        self.fc1 = nn.Linear(in_features=32 * 128 * 128, out_features=120)        
+        self.bnfc1 = nn.BatchNorm1d(120)
+        self.fc2 = nn.Linear(in_features=120, out_features=10)
+          
         #CLASStorch.nn.Linear(in_features, out_features, bias=True, device=None, dtype=None)
         #in_features指的是输入的二维张量的大小
         #out_features指的是输出的二维张量的大小
@@ -92,46 +103,59 @@ class Net(nn.Module):
         # example:
         # out = self.relu(self.conv1(x))
         # (batch_size, 64, 256, 256)
+       
+       
         out = self.conv1(x) 
         out = self.relu1(out)
-        out = self.conv2(out) 
-        out = self.relu2(out)
-        out = self.conv3(out) 
-        out = self.relu3(out)
         out = self.maxpool1(out)
         
-        out = self.conv4(out)        
-        out = self.relu4(out) 
-        out = self.conv5(out)        
-        out = self.relu5(out)         
-        out = self.maxpool2(out)
-        out = self.maxpool3(out)
+        out = self.conv2(out) 
+        out = self.relu2(out)
         
-        out = torch.flatten(out, 1)
+        out = self.conv3(out) 
+        out = self.relu3(out)
+                        
+        out = self.conv4(out)        
+        out = self.relu4(out)
+        out = self.drout1(out) 
+        
+        out = self.conv5(out)        
+        out = self.relu5(out)
+                 
+        out = self.conv6(out)        
+        out = self.relu6(out)
+
+        out = self.conv7(out)        
+        out = self.relu7(out)
+        out = self.drout2(out)
+             
+        out = torch.flatten(out, 1)       
         out = self.fc1(out) 
-        out = self.fc2(out) 
-        out = self.fc3(out)
-        out = self.fc4(out)  
+        out = self.bnfc1(out) 
+        out = self.fc2(out)
+        out = nn.functional.softmax(out, dim=1)          
         # ========================
         return out   
 
-    def calc_acc(output, target):
-        predicted = torch.max(output, 1)[1]
-        num_samples = target.size(0)
-        num_correct = (predicted == target).sum().item()
-        return num_correct / num_samples
-
-
-def train(model,device,n_epochs,train_loader,criterion,optimizer):
+def train(model,device,n_epochs,train_loader,valid_loader,criterion,optimizer):
     train_acc_his=[]
     train_losses_his=[]
-    for epoch in range(1, n_epochs+1):
+
+    valid_acc_his=[]
+    valid_losses_his=[]
+   
+    for epoch in range(1, n_epochs+1):        
         # keep track of training
         train_loss = 0.0
         train_losses = []
         train_correct = 0
         train_total = 0
-        
+
+        valid_loss = 0.0
+        valid_losses=[]
+        val_correct = 0
+        val_total = 0
+                
         #torch.zeros(*size, *, out=None, dtype=None, layout=torch.strided, device=None, requires_grad=False)
         #size：定义输出张量形状的整数序列。可以是可变数量的参数，也可以是列表或元组之类的集合。
         #out：指定输出的tensor。
@@ -142,7 +166,10 @@ def train(model,device,n_epochs,train_loader,criterion,optimizer):
         
         train_pred = torch.zeros(10,1)
         train_target = torch.zeros(10,1)
+        val_pred = torch.zeros(10,1)
+        val_target = torch.zeros(10,1)
         count=0
+        count2=0
         print('running epoch: {}'.format(epoch))
         ###################
         # train the model #
@@ -155,15 +182,13 @@ def train(model,device,n_epochs,train_loader,criterion,optimizer):
         #BATCH_SIZE = 10 , total step = 1750 / 10 = 175
         step = 0
         for data, target in train_loader:
-            step = step + 1  
-            print("train_step=",step)         
+            step = step + 1           
             # move tensors to  device
             data, target = data.to(device), target.to(device)
             # =============================================
             # TODO 4: initialize optimizer to zero gradient
             # clear the gradients of all optimized variables
             optimizer.zero_grad()
-            data.requires_grad = True
             # =================================================
             # forward pass: compute predicted outputs by passing inputs to the model
             output = model(data)
@@ -173,18 +198,21 @@ def train(model,device,n_epochs,train_loader,criterion,optimizer):
             loss = criterion(output, target)
             # backward pass: compute gradient of the loss with respect to model parameters
             loss.backward()
+            optimizer.step()
             # =============================================
             #calculate accuracy
             pred = output.data.max(dim = 1, keepdim = True)[1]
+            #print("pred=",pred)
             train_correct += np.sum(np.squeeze(pred.eq(target.data.view_as(pred))).cpu().numpy())
+            #print("target.data.view_as(pred)=",target.data.view_as(pred))
             train_total += data.size(0)
-            train_losses.append(loss.item()*data.size(0))
-            optimizer.step()
+            train_losses.append(loss.item()*data.size(0))            
             
-            print("train_total=",train_total)
-            print("train_correct=",train_correct)
-            print("train_losses=",train_losses)
-                       
+            print("train_step=",step)
+            #print("train_correct=",train_correct)
+            #print("train_total=",train_total)
+            #print("train_losses=",loss.item()*data.size(0))
+            
             if count==0:
                 train_pred=pred
                 train_target=target.data.view_as(pred)
@@ -196,92 +224,60 @@ def train(model,device,n_epochs,train_loader,criterion,optimizer):
         train_pred=train_pred.cpu().view(-1).numpy().tolist()
         train_target=train_target.cpu().view(-1).numpy().tolist()
 
-        # calculate average losses
-        train_loss=np.average(train_losses)
-
-        # calculate average accuracy
-        train_acc=train_correct/train_total
-
-        train_acc_his.append(train_acc)
-        train_losses_his.append(train_loss)
-       
-    return train_acc_his,train_losses_his,model
-
-def validation(model, device, n_epochs, valid_loader, criterion): 
-    valid_acc_his=[]
-    valid_losses_his=[]
-    for epoch in range(1, n_epochs+1):
-        valid_loss = 0.0
-        valid_losses=[]
-        val_correct = 0
-        val_total = 0
-        val_pred = torch.zeros(10,1)
-        val_target = torch.zeros(10,1)
-        count=0
-        print('running epoch: {}'.format(epoch))
-        ######################    
+        ##########################    
         # validate the model #
-        ######################
+        ##########################
         # ===============================
         # TODO 6: switch the model to validation mode
         model.eval()
         # ===============================
-        #valid_loader = total * 30 % = 2500 * 0.3 = 750
-        #BATCH_SIZE = 10 , total step = 750 / 10 = 75
         step = 0
-        with torch._no_grad():
-            for data, target in valid_loader:
-                step = step + 1
-                print("validation step=",step)
-                data, target = data.to(device), target.to(device)
-                # forward pass: compute predicted outputs by passing inputs to the model
-                output = model(data)
-                # calculate the batch loss
-                loss = criterion(output, target)
-                #calculate accuracy
-                pred = output.data.max(dim = 1, keepdim = True)[1]
-                val_correct += np.sum(np.squeeze(pred.eq(target.data.view_as(pred))).cpu().numpy())
-                val_total += data.size(0)
-                valid_losses.append(loss.item()*data.size(0))
+        with torch.no_grad():
+          for data, target in valid_loader:
+              step = step + 1
+              data, target = data.to(device), target.to(device)
+              # forward pass: compute predicted outputs by passing inputs to the model
+              output = model(data)
+              # calculate the batch loss
+              loss =criterion(output, target)
+              #calculate accuracy
+              pred = output.data.max(dim = 1, keepdim = True)[1]
+              val_correct += np.sum(np.squeeze(pred.eq(target.data.view_as(pred))).cpu().numpy())
+              val_total += data.size(0)
+              valid_losses.append(loss.item()*data.size(0))
 
-                print("val_correct=",valid_acc_his)
-                print("valid_losses=",valid_losses_his)
+              print("validate_step=",step)
+              #print("validate_correct=",val_correct)
+              #print("validate_total=",val_total)
+              #print("validate_losses=",loss.item()*data.size(0))
+            
+              if count2==0:
+                  val_pred=pred
+                  val_target=target.data.view_as(pred)
+                  count2=count2+1
+              else:
+                  val_pred=torch.cat((val_pred,pred), 0)
+                  val_target=torch.cat((val_target,target.data.view_as(pred)), 0)
               
-                if count==0:
-                    val_pred=pred
-                    val_target=target.data.view_as(pred)
-                    count=count+1
-                else:
-                    val_pred=torch.cat((val_pred,pred), 0)
-                    val_target=torch.cat((val_target,target.data.view_as(pred)), 0)
-                
-            val_pred=val_pred.cpu().view(-1).numpy().tolist()
-            val_target=val_target.cpu().view(-1).numpy().tolist()
+          val_pred=val_pred.cpu().view(-1).numpy().tolist()
+          val_target=val_target.cpu().view(-1).numpy().tolist()
 
-            # ================================
-            # TODO 8: calculate accuracy, loss    
-            # calculate average losses
-            probabilities = torch.exp(output)
-            top_prob, top_class = probabilities.topk(1, dim=1)
-            predictions = top_class == target.view(*top_class.shape)
-            valid_acc += torch.mean(predictions.type(torch.FloatTensor)) 
+        # ================================
+        # TODO 8: calculate accuracy, loss    
+        # calculate average losses          
+        train_loss=np.average(train_losses)
+        valid_loss=np.average(valid_losses)
+        
+        # calculate average accuracy
+        train_acc=train_correct/train_total
+        valid_acc=val_correct/val_total
 
-            # ================================   
+        train_acc_his.append(train_acc)
+        train_losses_his.append(train_loss)
+        valid_acc_his.append(valid_acc)
+        valid_losses_his.append(valid_loss)
 
-            # ================================
-            # TODO 8: calculate accuracy, loss    
-            # calculate average losses
-            #valid_loss=np.average(valid_losses)
-                                
-            # calculate average accuracy
-            #valid_acc=val_correct/val_total
-                    
-            #valid_acc_his.append(valid_acc)
-            #valid_losses_his.append(valid_loss)
-            # ================================
-       
-    return valid_acc_his,valid_losses_his  
-
+    return train_acc_his,train_losses_his,valid_acc_his,valid_losses_his,model
 
 def main():
     # ==================
@@ -297,11 +293,11 @@ def main():
         #每批丟入多少張圖片   
     BATCH_SIZE = 10
         #訓練資料路徑
-    TRAIN_DATA_PATH = '/home/lenovo/DP/LAB2/data/train'
+    TRAIN_DATA_PATH = '/content/drive/MyDrive/data/train'
         #驗證資料路徑
-    VALID_DATA_PATH = '/home/lenovo/DP/LAB2/data/train'
+    VALID_DATA_PATH = '/content/drive/MyDrive/data/train'
     EPOCHS = 40
-    MODEL_PATH = '/home/lenovo/DP/LAB2/data/model.pt'
+    MODEL_PATH = '/content/drive/MyDrive/data/model.pt'
 
     # train_transform 進行影像強化提高資料多樣性 
     # valid_transform 保持驗證公平性只採用調整大小
@@ -350,16 +346,6 @@ def main():
     # TODO 13 : set up dataloaders
     train_loader = torch.utils.data.DataLoader(train_data, batch_size=BATCH_SIZE,shuffle=True)
     valid_loader = torch.utils.data.DataLoader(valid_data, batch_size=BATCH_SIZE,shuffle=True)
-    DOWNLOAD_MNIST = True
-    #MNIST_loader = torchvision.datasets.MNIST(root = './mnist',train = True,transform = torchvision.transforms.ToTensor(),download = DOWNLOAD_MNIST)
-    #print(MNIST_loader.train_data.size())
-    #print(MNIST_loader.train_labels.size())
-    #plt.ion()
-    #for i in range(11):
-        #plt.imshow(MNIST_loader.train_data[i].numpy(), cmap = 'gray')
-        #plt.title('%i' % MNIST_loader.train_labels[i])
-        #plt.pause(0.5)
-    #plt.show()
     # ============================
 
     # build model, criterion and optimizer
@@ -379,6 +365,7 @@ def main():
     #RMSprop    Implements RMSprop algorithm.
     #Rprop      Implements the resilient backpropagation algorithm.
     #SGD        Implements stochastic gradient descent (optionally with momentum).
+     
     # ================================
     # TODO 14: criterion and optimizer
     #optimizer = torch.optim.Adam(params = model.parameters(), lr = LEARNING_RATE)
@@ -386,18 +373,23 @@ def main():
     criterion = nn.CrossEntropyLoss()
     # ================================
     
-    train_acc_his,train_losses_his,model = train(model_1,device,EPOCHS,train_loader,criterion,optimizer)
+    print("===== start train =====")
+    train_acc_his,train_losses_his,valid_acc_his,valid_losses_his,model = train(model_1,device,EPOCHS,train_loader,valid_loader,criterion,optimizer)
+    print("===== end train =====")
+    print("===== test result =====")
     print("train_acc_his=",train_acc_his)
     print("train_losses_his=",train_losses_his)
-    print("model=",model)
-
-    valid_acc_his,valid_losses_his = validation(model_1,device,EPOCHS,valid_loader,criterion)
     print("valid_acc_his=",valid_acc_his)
     print("valid_losses_his=",valid_losses_his)
+    print("model=",model)
+
+    #valid_acc_his,valid_losses_his = validation(model_1,device,EPOCHS,valid_loader,criterion)
+    #print("valid_acc_his=",valid_acc_his)
+    #print("valid_losses_his=",valid_losses_his)
 
     # ==================================
     # TODO 15: save the model parameters
-    torch.save(model.state_dict(), MODEL_PATH)
+    torch.save(model, MODEL_PATH)
     # ==================================
 
     # ========================================
@@ -406,15 +398,17 @@ def main():
     # hint: plt.plot
     plt.figure(figsize=(15,10))
     plt.subplot(221)
+    plt.plot(train_acc_his, 'bo', label = 'training accuracy')
+    plt.plot(valid_acc_his, 'r', label = 'validation accuracy')
+    plt.title("Simple CNN Accuracy")
+    plt.legend(loc='upper left')
+    plt.legend()
+    plt.subplot(222)
     plt.plot(train_losses_his, 'bo', label = 'training loss')
     plt.plot(valid_losses_his, 'r', label = 'validation loss')
     plt.title("Simple CNN Loss")
     plt.legend(loc='upper left')
-    plt.subplot(222)
-    plt.plot(train_acc_his, 'bo', label = 'trainingaccuracy')
-    plt.plot(valid_acc_his, 'r', label = 'validation accuracy')
-    plt.title("Simple CNN Accuracy")
-    plt.legend(loc='upper left')
+    plt.legend()
     plt.show()
     # =========================================
     
