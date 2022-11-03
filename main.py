@@ -79,9 +79,9 @@ class Net(nn.Module):
         self.conv7 = nn.Conv2d(in_channels=64,out_channels=32, kernel_size=3, stride=1, padding=1) 
         self.relu7 = nn.ReLU()  
         self.drout2 = nn.Dropout2d(0.5)
-                
+       
         # Fully connected 1 ,#input_shape=(32*128*128)
-        self.fc1 = nn.Linear(in_features=32 * 128 * 128, out_features=120)        
+        self.fc1 = nn.Linear(in_features=32 * 128 * 128, out_features=120)       
         self.bnfc1 = nn.BatchNorm1d(120)
         self.fc2 = nn.Linear(in_features=120, out_features=10)
           
@@ -231,8 +231,8 @@ def train(model,device,n_epochs,train_loader,valid_loader,criterion,optimizer):
         # TODO 6: switch the model to validation mode
         model.eval()
         # ===============================
-        step = 0
         with torch.no_grad():
+          step=0
           for data, target in valid_loader:
               step = step + 1
               data, target = data.to(device), target.to(device)
@@ -293,11 +293,12 @@ def main():
         #每批丟入多少張圖片   
     BATCH_SIZE = 10
         #訓練資料路徑
-    TRAIN_DATA_PATH = '/content/drive/MyDrive/data/train'
+    TRAIN_DATA_PATH = '/content/drive/MyDrive/train'
         #驗證資料路徑
-    VALID_DATA_PATH = '/content/drive/MyDrive/data/train'
+    VALID_DATA_PATH = '/content/drive/MyDrive/train'
+    TEST_DATA_PATH = '/content/drive/MyDrive/test_data'
     EPOCHS = 40
-    MODEL_PATH = '/content/drive/MyDrive/data/model.pt'
+    MODEL_PATH = '/content/drive/MyDrive/train/model.pt'
 
     # train_transform 進行影像強化提高資料多樣性 
     # valid_transform 保持驗證公平性只採用調整大小
@@ -333,13 +334,14 @@ def main():
     train_data = datasets.ImageFolder(TRAIN_DATA_PATH, transform=train_transform)
     #print(train_data.class_to_idx)
     valid_data = datasets.ImageFolder(VALID_DATA_PATH, transform=train_transform)
+    test_data = datasets.ImageFolder(TEST_DATA_PATH, transform=train_transform)
     # =================
 
     #切分70%當作訓練集、30%當作驗證集
-    train_size = int(0.7 * len(train_data))
-    valid_size = len(train_data) - train_size
+    #train_size = int(0.7 * len(train_data))
+    #valid_size = len(train_data) - train_size
     #任意分配圖檔
-    train_data, valid_data = torch.utils.data.random_split(train_data, [train_size, valid_size])
+    #train_data, valid_data = torch.utils.data.random_split(train_data, [train_size, valid_size])
 
     # Dataloader可以用Batch的方式訓練 shuffle = True 表示把資料打亂
     # ============================
